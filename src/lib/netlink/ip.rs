@@ -6,6 +6,7 @@ use crate::Ipv6AddrInfo;
 use crate::Ipv6Info;
 use crate::netlink::nla::parse_as_ipv4;
 use crate::netlink::nla::parse_as_ipv6;
+use crate::NisporError;
 use netlink_packet_route::rtnl::address::nlas::Nla::{
     Address, CacheInfo, Local,
 };
@@ -79,7 +80,7 @@ fn parse_ipv4_nlas(nl_msg: &AddressMessage) -> (u32, Ipv4AddrInfo) {
         } else if let Address(addr_vec) = nla {
             peer = parse_as_ipv4(addr_vec.as_slice()).to_string();
         } else if let CacheInfo(cache_info_vec) = nla {
-            let cache_info = parse_cache_info(&cache_info_vec);
+            let cache_info = parse_cache_info(&cache_info_vec).unwrap();
             addr.preferred_lft = left_time_to_string(cache_info.ifa_prefered);
             addr.valid_lft = left_time_to_string(cache_info.ifa_valid);
         }
@@ -101,7 +102,7 @@ fn parse_ipv6_nlas(nl_msg: &AddressMessage) -> (u32, Ipv6AddrInfo) {
         if let Address(addr_vec) = nla {
             addr.address = parse_as_ipv6(addr_vec.as_slice()).to_string();
         } else if let CacheInfo(cache_info_vec) = nla {
-            let cache_info = parse_cache_info(&cache_info_vec);
+            let cache_info = parse_cache_info(&cache_info_vec).unwrap();
             addr.preferred_lft = left_time_to_string(cache_info.ifa_prefered);
             addr.valid_lft = left_time_to_string(cache_info.ifa_valid);
         }
@@ -117,15 +118,15 @@ struct IfaCacheInfo {
     tstamp: u32, */
 }
 
-fn parse_cache_info(cache_info_raw: &[u8]) -> IfaCacheInfo {
+fn parse_cache_info(cache_info_raw: &[u8]) -> Result<IfaCacheInfo, NisporError> {
     if cache_info_raw.len() != 16 {
-        panic!(
+        return Err(format!(
             "Got invalid ifa_cacheinfo, expect [u8; 32], got {} u8",
             cache_info_raw.len()
-        );
+        ).as_str().into());
     } else {
         // The struct ifa_cacheinfo is storing valid time as second u32
-        IfaCacheInfo {
+        Ok(IfaCacheInfo {
             ifa_prefered: u32::from_ne_bytes([
                 cache_info_raw[0],
                 cache_info_raw[1],
@@ -138,7 +139,7 @@ fn parse_cache_info(cache_info_raw: &[u8]) -> IfaCacheInfo {
                 cache_info_raw[6],
                 cache_info_raw[7],
             ]),
-        }
+        })
     }
 }
 

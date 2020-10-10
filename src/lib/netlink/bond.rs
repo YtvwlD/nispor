@@ -1,7 +1,6 @@
 use crate::netlink::nla::parse_as_u16;
 use crate::netlink::nla::parse_as_u32;
 use crate::netlink::nla::parse_as_u8;
-use crate::netlink::nla::parse_as_ipv4;
 use crate::parse_as_mac;
 use crate::BondAdInfo;
 use crate::BondInfo;
@@ -10,6 +9,7 @@ use crate::BondMode;
 use crate::BondSubordinateInfo;
 use crate::BondSubordinateState;
 use netlink_packet_route::rtnl::nlas::NlasIterator;
+use std::convert::TryInto;
 use std::net::Ipv4Addr;
 
 const IFLA_BOND_MODE: u16 = 1;
@@ -21,7 +21,11 @@ fn parse_as_nested_ipv4_addr(raw: &[u8]) -> Vec<Ipv4Addr> {
     for nla in nlas {
         match nla {
             Ok(nla) => {
-                addresses.push(parse_as_ipv4(nla.value()))
+                let res: Result<[u8; 4], _> = nla.value().try_into();
+                match res {
+                    Ok(data) => addresses.push(data.into()),
+                    Err(e) => eprintln!("Ipv4Addr length not correct: {}", e),
+                }
             }
             Err(e) => {
                 eprintln!("{}", e);
@@ -33,8 +37,8 @@ fn parse_as_nested_ipv4_addr(raw: &[u8]) -> Vec<Ipv4Addr> {
 
 fn ipv4_addr_array_to_string(addrs: &[Ipv4Addr]) -> String {
     let mut rt = String::new();
-    for i in 0..(addrs.len()) {
-        rt.push_str(&addrs[i].to_string());
+    for (i, addr) in addrs.iter().enumerate() {
+        rt.push_str(&addr.to_string());
         if i != addrs.len() - 1 {
             rt.push_str(",");
         }
