@@ -55,3 +55,12 @@ impl std::convert::From<std::io::Error> for NisporError {
         }
     }
 }
+
+impl std::convert::From<&str> for NisporError {
+    fn from(msg: &str) -> Self {
+        NisporError {
+            kind: ErrorKind::NisporBug,
+            msg: msg.to_string(),
+        }
+    }
+}
