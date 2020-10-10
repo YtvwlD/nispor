@@ -280,12 +280,12 @@ pub(crate) fn parse_nl_msg_to_iface(nl_msg: &LinkMessage) -> Option<Iface> {
             for info in infos {
                 if let nlas::Info::SlaveKind(d) = info {
                     // Remove the tailing \0
-                    match std::str::from_utf8(&(d.as_slice()[0..(d.len() - 1)]))
+                    match std::ffi::CStr::from_bytes_with_nul(&d.as_slice()).ok()
+                    .and_then(|s| s.to_str().ok())
                     {
-                        Ok(controller_type) => {
-                            iface_state.controller_type =
-                                Some(controller_type.into())
-                        }
+                        Some(controller_type) => {
+                            iface_state.controller_type = Some(controller_type.into())
+                        },
                         _ => (),
                     }
                 }
